@@ -1,50 +1,71 @@
 import streamlit as st
 import numpy as np
+import matplotlib.pyplot as plt
 
-st.title("Hedging Impermanent Loss in Concentrated Liquidity Pools")
+st.set_page_config(page_title="CL IL Hedge Simulator", layout="centered")
+st.title("💧 Concentrated Liquidity Impermanent Loss & Hedge Visualizer")
 
-# --- Inputs ---
-p0 = st.number_input("Initial Price $p_0$", value=1.0, min_value=0.01, step=0.01)
-p_min = st.number_input("Lower Price Bound $p_{min}$ (less than $p_0$)", value=0.8, min_value=0.001, max_value=0.99, step=0.01)
-p_max = st.number_input("Upper Price Bound $p_{max}$ (greater than $p_0$)", value=1.2, min_value=1.01, max_value=100.0, step=0.01)
-L = st.number_input("Liquidity $L$", value=1000.0, min_value=1.0)
+# --- User Inputs ---
+p0 = st.number_input("Initial Price $p_0$", min_value=0.0001, value=1.0)
+pmin = st.number_input("Lower Bound $p_{min}$", min_value=0.0001, max_value=p0-0.0001, value=0.8)
+pmax = st.number_input("Upper Bound $p_{max}$", min_value=p0+0.0001, value=1.2)
+L = st.number_input("Liquidity $L$", min_value=0.0001, value=1000.0)
 
-p_up = st.number_input("Activation Threshold Up $p_{up}$ (between $p_0$ and $p_{max}$)", value=1.05, min_value=p0, max_value=p_max, step=0.01)
-p_down = st.number_input("Activation Threshold Down $p_{down}$ (between $p_{min}$ and $p_0$)", value=0.95, min_value=p_min, max_value=p0, step=0.01)
-
-# --- Validation ---
-if not (p_min < p0 < p_max):
-    st.error("Ensure: $p_{min} < p_0 < p_{max}$")
-    st.stop()
-
-# --- Core Calculations ---
 sqrt_p0 = np.sqrt(p0)
-sqrt_pmax = np.sqrt(p_max)
-sqrt_pmin = np.sqrt(p_min)
+sqrt_pmin = np.sqrt(pmin)
+sqrt_pmax = np.sqrt(pmax)
 
-delta_xA_sell = L * (1/np.sqrt(p0) - 1/np.sqrt(p_max))
-delta_xB_sell = L * (np.sqrt(p0) - np.sqrt(p_min))
+# --- Define price grid ---
+p_grid = np.linspace(pmin, pmax, 500)
 
-# IL at boundaries
-IL_A_max = (p_max - np.sqrt(p0 * p_max)) * delta_xA_sell
-IL_B_max = (1/p_min - 1/np.sqrt(p0 * p_min)) * delta_xB_sell
+# --- Impermanent Loss Calculations ---
+def IL_A(p):
+    sqrt_p = np.sqrt(p)
+    delta_xA = L * (1/np.sqrt(p0) - 1/np.sqrt(p))
+    return (p - np.sqrt(p0*p)) * delta_xA
 
-# Hedge sizes with activation thresholds
-xA_hedge = ((p_max - np.sqrt(p0 * p_max)) / (p_max - p_up)) * delta_xA_sell if p_up < p_max else 0
-xB_hedge = ((1/p_min - 1/np.sqrt(p0 * p_min)) / (1/p_min - 1/p_down)) * delta_xB_sell if p_down > p_min else 0
+def IL_B(p):
+    sqrt_p = np.sqrt(p)
+    delta_xB = L * (sqrt_p0 - sqrt_p)
+    return (1/np.sqrt(p0*p) - 1/p) * delta_xB
 
-# --- Output ---
-st.markdown("### 📊 Results", unsafe_allow_html=True)
+il_vals = np.where(p_grid >= p0, IL_A(p_grid), IL_B(p_grid))
 
-st.latex(r"\Delta x_A^{\rm sell} = %.4f" % delta_xA_sell)
-st.latex(r"\Delta x_B^{\rm sell} = %.4f" % delta_xB_sell)
+# --- Hedge Size Computations ---
+dxA_max = L * (1/sqrt_p0 - 1/sqrt_pmax)
+xA_hedge = ((pmax - np.sqrt(p0 * pmax)) / (pmax - p0)) * dxA_max
+
+
+dxB_max = L * (sqrt_p0 - sqrt_pmin)
+xB_hedge = ((1/pmin - 1/np.sqrt(p0 * pmin)) / (1/pmin - 1/p0)) * dxB_max
+
+# --- Hedge PnL Tracking ---
+def hedge_A_pnl(p):
+    return xA_hedge * (p - p0)
+
+def hedge_B_pnl(p):
+    return xB_hedge * (1/p - 1/p0)
+
+hedge_vals = np.where(p_grid >= p0, hedge_A_pnl(p_grid), hedge_B_pnl(p_grid))
+
+# --- Plotting ---
+fig, ax = plt.subplots()
+ax.plot(p_grid, il_vals, label="Impermanent Loss", color='red')
+ax.plot(p_grid, hedge_vals, label="Hedge PnL", color='green')
+ax.plot(p_grid, hedge_vals - il_vals, label="Net PnL", color='blue')
+ax.axvline(p0, color='gray', linestyle='--', linewidth=1, label="$p_0$")
+ax.set_xlabel("Price $p$")
+ax.set_ylabel("PnL (in Token B units)")
+ax.legend()
+ax.grid(True)
+
+st.pyplot(fig)
+
+# --- Display Hedge Sizes ---
+st.markdown("### 📊 Hedge Sizing Results")
+st.latex(r"x_A^{\text{hedge}} = %.4f" % xA_hedge)
+st.latex(r"x_B^{\text{hedge}} = %.4f" % xB_hedge)
 
 st.markdown("---")
-st.markdown("**Impermanent Loss at Range Boundaries**:")
-st.latex(r"\text{IL}_A^{\max} = \left(p_{\max} - \sqrt{p_0 p_{\max}}\right) \cdot \Delta x_A^{\rm sell} = %.4f" % IL_A_max)
-st.latex(r"\text{IL}_B^{\max} = \left(\frac{1}{p_{\min}} - \frac{1}{\sqrt{p_0 p_{\min}}} \right) \cdot \Delta x_B^{\rm sell} = %.4f" % IL_B_max)
-
-st.markdown("---")
-st.markdown("**Hedge Sizes** (with thresholds):")
-st.latex(r"x_A^{\rm hedge} = %.4f" % xA_hedge)
-st.latex(r"x_B^{\rm hedge} = %.4f" % xB_hedge)
+st.markdown("Net PnL = Hedge PnL - Impermanent Loss")
+st.markdown("Token A is sold as price rises, Token B is sold as price falls.")
