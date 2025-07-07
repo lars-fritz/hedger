@@ -69,3 +69,4 @@ st.latex(r"x_B^{\text{hedge}} = %.4f" % xB_hedge)
 st.markdown("---")
 st.markdown("Net PnL = Hedge PnL - Impermanent Loss")
 st.markdown("Token A is sold as price rises, Token B is sold as price falls.")
+
