@@ -27,7 +27,7 @@ def IL_A(p):
 def IL_B(p):
     sqrt_p = np.sqrt(p)
     delta_xB = L * (sqrt_p0 - sqrt_p)
-    return (1/np.sqrt(p0*p) - 1/p) * delta_xB
+    return (1/p-1/np.sqrt(p0*p) ) * delta_xB
 
 il_vals = np.where(p_grid >= p0, IL_A(p_grid), IL_B(p_grid))
 
