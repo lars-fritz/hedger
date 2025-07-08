@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-import math
+import math # Keep math for potential other uses, but replace math.sqrt with np.sqrt where arrays are involved
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="CL IL Hedge Simulator", layout="centered")
@@ -23,61 +23,55 @@ sqrt_pmax = np.sqrt(pmax)
 # --- Define price grid for static plot ---
 p_grid = np.linspace(pmin, pmax, 500)
 
-# --- Token Holding Functions (from previous version) ---
+# --- Token Holding Functions ---
 def calculate_xA(L_val, p, p_max_val):
     """
     Calculates the amount of token A held at price p.
     x_A(p) = L * (1/sqrt(p) - 1/sqrt(p_max))
+    Uses np.sqrt to handle both scalar and numpy array inputs for p.
     """
-    if p <= 0 or p_max_val <= 0:
-        return 0.0 # Handle invalid prices
-    return L_val * (1 / math.sqrt(p) - 1 / math.sqrt(p_max_val))
+    return L_val * (1 / np.sqrt(p) - 1 / np.sqrt(p_max_val))
 
 def calculate_xB(L_val, p, p_min_val):
     """
     Calculates the amount of token B held at price p.
     x_B(p) = L * (sqrt(p) - sqrt(p_min))
+    Uses np.sqrt to handle both scalar and numpy array inputs for p.
     """
-    if p <= 0 or p_min_val <= 0:
-        return 0.0 # Handle invalid prices
-    return L_val * (math.sqrt(p) - math.sqrt(p_min_val))
+    return L_val * (np.sqrt(p) - np.sqrt(p_min_val))
 
-# --- IL Functions (from previous version) ---
+# --- IL Functions ---
 def calculate_delta_xA_sell(L_val, p0_val, p):
     """
     Calculates the amount of Token A sold when price increases from p0 to p.
     Delta x_A_sell(p) = L * (1/sqrt(p0) - 1/sqrt(p))
+    Uses np.sqrt to handle both scalar and numpy array inputs for p.
     """
-    if p0_val <= 0 or p <= 0:
-        return 0.0
-    return L_val * (1 / math.sqrt(p0_val) - 1 / math.sqrt(p))
+    return L_val * (1 / np.sqrt(p0_val) - 1 / np.sqrt(p))
 
 def calculate_delta_xB_sell(L_val, p0_val, p):
     """
     Calculates the amount of Token B sold when price decreases from p0 to p.
     Delta x_B_sell(p) = L * (sqrt(p0) - sqrt(p))
+    Uses np.sqrt to handle both scalar and numpy array inputs for p.
     """
-    if p0_val <= 0 or p <= 0:
-        return 0.0
-    return L_val * (math.sqrt(p0_val) - math.sqrt(p))
+    return L_val * (np.sqrt(p0_val) - np.sqrt(p))
 
 def calculate_il_A(p, p0_val, delta_xA_sell_val):
     """
     Calculates Impermanent Loss from selling Token A (price rises).
     IL_A(p) = (p - sqrt(p0 * p)) * Delta x_A_sell(p)
+    Uses np.sqrt to handle both scalar and numpy array inputs for p.
     """
-    if p <= 0 or p0_val <= 0:
-        return 0.0
-    return (p - math.sqrt(p0_val * p)) * delta_xA_sell_val
+    return (p - np.sqrt(p0_val * p)) * delta_xA_sell_val
 
 def calculate_il_B(p, p0_val, delta_xB_sell_val):
     """
     Calculates Impermanent Loss from selling Token B (price falls).
     IL_B(p) = (1/p - 1/sqrt(p0 * p)) * Delta x_B_sell(p)
+    Uses np.sqrt to handle both scalar and numpy array inputs for p.
     """
-    if p <= 0 or p0_val <= 0:
-        return 0.0
-    return (1 / p - 1 / math.sqrt(p0_val * p)) * delta_xB_sell_val
+    return (1 / p - 1 / np.sqrt(p0_val * p)) * delta_xB_sell_val
 
 # --- IL Calculation for Static Plot ---
 # Using the IL functions from the provided writeup
