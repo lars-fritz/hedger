@@ -13,7 +13,6 @@ L = st.number_input("Liquidity $L$", min_value=0.0001, value=1000.0)
 vol = st.number_input("Volatility (annualized, e.g. 0.1 = 10%)", min_value=0.0001, value=0.1)
 steps = st.slider("Number of time steps", min_value=10, max_value=500, value=100)
 fee_rate = st.number_input("Fee rate (e.g. 0.003 = 0.3%)", min_value=0.0, max_value=0.1, value=0.003)
-rebalancing = st.checkbox("Enable hedge rebalancing", value=True)
 
 # --- Static View (IL vs Hedge) ---
 sqrt_p0 = np.sqrt(p0)
@@ -53,7 +52,7 @@ ax1.legend()
 ax1.grid(True)
 st.pyplot(fig1)
 
-st.markdown("### 📐 Hedge Sizing")
+st.markdown("### 🖐️ Hedge Sizing")
 st.latex(r"x_A^{\text{hedge}} = %.4f" % xA_hedge)
 st.latex(r"x_B^{\text{hedge}} = %.4f" % xB_hedge)
 
@@ -61,6 +60,7 @@ st.latex(r"x_B^{\text{hedge}} = %.4f" % xB_hedge)
 dt = 1 / steps
 
 # --- Price Path Simulation ---
+np.random.seed()  # ensure randomness without fixed seed
 price_path = [p0]
 for _ in range(steps):
     drift = -0.5 * vol ** 2 * dt
@@ -125,11 +125,9 @@ for i in range(1, len(price_path)):
     if p >= p0:
         xA_target, IL = hedge_A(p)
         token = "A"
-        hedge_price = p
     else:
         xB_target, IL = hedge_B(p)
         token = "B"
-        hedge_price = 1 / p
 
     if hedge_token != token:
         if hedge_token == "A":
@@ -140,20 +138,10 @@ for i in range(1, len(price_path)):
 
     hedge_token = token
 
-    if rebalancing:
-        if token == "A":
-            delta = xA_target - hedge_position
-            cum_pnl += delta * (p - prev_p)
-            hedge_position = xA_target
-        else:
-            delta = xB_target - hedge_position
-            cum_pnl += -delta * (1 / p - 1 / prev_p)
-            hedge_position = xB_target
+    if token == "A":
+        cum_pnl += hedge_position * (p - prev_p)
     else:
-        if token == "A":
-            cum_pnl += hedge_position * (p - prev_p)
-        else:
-            cum_pnl += -hedge_position * (1 / p - 1 / prev_p)
+        cum_pnl += -hedge_position * (1 / p - 1 / prev_p)
 
     xA_prev, xB_prev = xA, xB
     il_history.append(IL)
