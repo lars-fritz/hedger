@@ -98,6 +98,7 @@ def hedge_B(p):
     return dxB, IL
 
 # --- Simulation Loop ---
+
 xA_prev, xB_prev = get_token_amounts(p0, L, pmin, pmax)
 hedge_position = 0
 hedge_token = None
@@ -105,7 +106,6 @@ realized_pnl = [0.0]
 unrealized_pnl = [0.0]
 il_history = [0.0]
 
-# New fee variables
 cum_fee_A = 0.0
 cum_fee_B = 0.0
 fee_A_history = [0.0]
@@ -116,19 +116,15 @@ cum_pnl = 0.0
 for i in range(1, len(price_path)):
     p = price_path[i]
     prev_p = price_path[i - 1]
-    
+
     xA, xB = get_token_amounts(p, L, pmin, pmax)
     xA_prev_step, xB_prev_step = get_token_amounts(prev_p, L, pmin, pmax)
 
-    # Calculate increments for each token (incoming tokens)
+    # --- Fee calculation based on incoming tokens ---
     inc_A = max(xA - xA_prev_step, 0)
     inc_B = max(xB - xB_prev_step, 0)
-
-    # Calculate fees on incoming tokens
     fee_A = fee_rate * inc_A
     fee_B = fee_rate * inc_B
-
-    # Accumulate fees
     cum_fee_A += fee_A
     cum_fee_B += fee_B
 
@@ -161,7 +157,9 @@ for i in range(1, len(price_path)):
     unrealized_pnl.append(cum_pnl - IL)
 
 # --- Plotting ---
+
 fig, axs = plt.subplots(2, 2, figsize=(14, 8))
+
 axs[0, 0].plot(price_path, label="Price")
 axs[0, 0].axhline(p0, color='gray', linestyle='--', label="$p_0$")
 axs[0, 0].set_title("Simulated Price Path")
