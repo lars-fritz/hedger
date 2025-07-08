@@ -60,7 +60,7 @@ st.latex(r"x_B^{\text{hedge}} = %.4f" % xB_hedge)
 dt = 1 / steps
 
 # --- Price Path Simulation ---
-np.random.seed()  # ensure randomness without fixed seed
+np.random.seed()  # remove fixed seed
 price_path = [p0]
 for _ in range(steps):
     drift = -0.5 * vol ** 2 * dt
@@ -84,7 +84,6 @@ def get_token_amounts(p, L, pmin, pmax):
         y = L * (sqrt_p - np.sqrt(pmin))
     return x, y
 
-# --- Hedge sizing functions ---
 def hedge_A(p):
     sqrt_p = np.sqrt(p)
     dxA = L * (1 / sqrt_p0 - 1 / sqrt_p)
@@ -99,13 +98,13 @@ def hedge_B(p):
 
 # --- Simulation Loop ---
 xA_prev, xB_prev = get_token_amounts(p0, L, pmin, pmax)
-hedge_position = 0
 hedge_token = None
+hedge_position = 0.0
+
 realized_pnl = [0.0]
 unrealized_pnl = [0.0]
 il_history = [0.0]
 fee_history = [0.0]
-
 cum_fee = 0.0
 cum_pnl = 0.0
 
@@ -122,6 +121,7 @@ for i in range(1, len(price_path)):
         fee += fee_rate * dxB
     cum_fee += fee
 
+    # Determine hedge token and IL
     if p >= p0:
         xA_target, IL = hedge_A(p)
         token = "A"
@@ -129,19 +129,27 @@ for i in range(1, len(price_path)):
         xB_target, IL = hedge_B(p)
         token = "B"
 
+    # Switch hedge only when token changes, and always keep one hedge open
     if hedge_token != token:
+        # Close previous hedge
         if hedge_token == "A":
             cum_pnl += hedge_position * (p - prev_p)
         elif hedge_token == "B":
             cum_pnl += -hedge_position * (1 / p - 1 / prev_p)
-        hedge_position = 0
 
-    hedge_token = token
+        # Open new hedge
+        if token == "A":
+            hedge_position = xA_target
+        else:
+            hedge_position = xB_target
 
-    if token == "A":
-        cum_pnl += hedge_position * (p - prev_p)
+        hedge_token = token
     else:
-        cum_pnl += -hedge_position * (1 / p - 1 / prev_p)
+        # Continue current hedge
+        if hedge_token == "A":
+            cum_pnl += hedge_position * (p - prev_p)
+        elif hedge_token == "B":
+            cum_pnl += -hedge_position * (1 / p - 1 / prev_p)
 
     xA_prev, xB_prev = xA, xB
     il_history.append(IL)
