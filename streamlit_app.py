@@ -1,8 +1,9 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go # Import Plotly graph objects
+from plotly.subplots import make_subplots # For creating subplots in Plotly
 import time
-import math # Keep math for potential other uses, but replace math.sqrt with np.sqrt where arrays are involved
+import math
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="CL IL Hedge Simulator", layout="centered")
@@ -105,20 +106,25 @@ def hedge_A_pnl_static(p_val): return xA_hedge * (p_val - p0)
 def hedge_B_pnl_static(p_val): return xB_hedge * (1/p_val - 1/p0)
 hedge_vals = np.where(p_grid >= p0, hedge_A_pnl_static(p_grid), hedge_B_pnl_static(p_grid))
 
-# --- Plot: Static IL vs Hedge PnL ---
+# --- Plot: Static IL vs Hedge PnL (Plotly) ---
 st.markdown("## 📊 Static View: IL vs Hedge vs Net PnL")
 
-fig1, ax1 = plt.subplots(figsize=(10, 6))
-ax1.plot(p_grid, il_vals, label="Impermanent Loss", color='red', linewidth=2)
-ax1.plot(p_grid, hedge_vals, label="Hedge PnL", color='green', linewidth=2)
-ax1.plot(p_grid, hedge_vals - il_vals, label="Net PnL (Hedge - IL)", color='blue', linewidth=2, linestyle='--')
-ax1.axvline(p0, color='gray', linestyle=':', linewidth=1.5, label="$p_0$")
-ax1.set_xlabel("Price $p$", fontsize=12)
-ax1.set_ylabel("PnL (Token B or A units)", fontsize=12)
-ax1.set_title("Impermanent Loss and Hedge PnL Across Price Range", fontsize=14)
-ax1.legend(fontsize=10)
-ax1.grid(True, linestyle='--', alpha=0.7)
-st.pyplot(fig1)
+fig1 = go.Figure()
+fig1.add_trace(go.Scatter(x=p_grid, y=il_vals, mode='lines', name='Impermanent Loss', line=dict(color='red', width=2)))
+fig1.add_trace(go.Scatter(x=p_grid, y=hedge_vals, mode='lines', name='Hedge PnL', line=dict(color='green', width=2)))
+fig1.add_trace(go.Scatter(x=p_grid, y=hedge_vals - il_vals, mode='lines', name='Net PnL (Hedge - IL)', line=dict(color='blue', width=2, dash='dash')))
+fig1.add_vline(x=p0, line_dash="dot", line_color="gray", line_width=1.5, annotation_text="$p_0$", annotation_position="top right")
+
+fig1.update_layout(
+    title_text="Impermanent Loss and Hedge PnL Across Price Range",
+    xaxis_title="Price $p$",
+    yaxis_title="PnL (Token B or A units)",
+    hovermode="x unified", # Shows all traces at a given x-value on hover
+    legend=dict(x=0.01, y=0.99, bgcolor='rgba(255,255,255,0.7)', bordercolor='rgba(0,0,0,0.2)'),
+    margin=dict(l=40, r=40, t=60, b=40),
+    height=500
+)
+st.plotly_chart(fig1, use_container_width=True)
 
 # --- Hedge Outputs ---
 st.markdown("### 📐 Hedge Sizing (Calculated for Max IL at Boundaries)")
@@ -217,36 +223,41 @@ def compute_il_hedge_pnl_and_fees(p_arr, L_val, p0_val, p_min_val, p_max_val, fe
 il_path, hedge_path, net_pnl_path, fees_A_path, fees_B_path = \
     compute_il_hedge_pnl_and_fees(p_path, L, p0, pmin, pmax, fee_rate, xA_hedge, xB_hedge)
 
-# --- Plot: Simulated Price + PnL Tracking + Fees ---
+# --- Plot: Simulated Price + PnL Tracking + Fees (Plotly) ---
 # Create a figure with three subplots stacked vertically
-fig2, (ax2, ax3, ax4) = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
+fig2 = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+                     subplot_titles=("Simulated Price Path", "Impermanent Loss, Hedge PnL, and Net PnL", "Accumulated Fees"))
 
 time_grid = np.linspace(0, T, steps)
 
 # Subplot 1: Price Path
-ax2.plot(time_grid, p_path, label="Simulated Price", color="black", linewidth=2)
-ax2.axhline(p0, color="gray", linestyle=":", linewidth=1.5, label="$p_0$")
-ax2.set_ylabel("Price $p$", fontsize=12)
-ax2.set_title("Simulated Price Path, PnL, and Accumulated Fees Over Time", fontsize=14)
-ax2.legend(fontsize=10)
-ax2.grid(True, linestyle='--', alpha=0.7)
+fig2.add_trace(go.Scatter(x=time_grid, y=p_path, mode='lines', name='Simulated Price', line=dict(color='black', width=2)),
+               row=1, col=1)
+fig2.add_hline(y=p0, line_dash="dot", line_color="gray", line_width=1.5, annotation_text="$p_0$", annotation_position="top right", row=1, col=1)
+fig2.update_yaxes(title_text="Price $p$", row=1, col=1)
 
 # Subplot 2: IL, Hedge, Net PnL
-ax3.plot(time_grid, il_path, label="Impermanent Loss", color='red', linewidth=2)
-ax3.plot(time_grid, hedge_path, label="Hedge PnL", color='green', linewidth=2)
-ax3.plot(time_grid, net_pnl_path, label="Net PnL (Hedge - IL)", color='blue', linewidth=2, linestyle='--')
-ax3.set_ylabel("PnL", fontsize=12)
-ax3.legend(fontsize=10)
-ax3.grid(True, linestyle='--', alpha=0.7)
+fig2.add_trace(go.Scatter(x=time_grid, y=il_path, mode='lines', name='Impermanent Loss', line=dict(color='red', width=2)),
+               row=2, col=1)
+fig2.add_trace(go.Scatter(x=time_grid, y=hedge_path, mode='lines', name='Hedge PnL', line=dict(color='green', width=2)),
+               row=2, col=1)
+fig2.add_trace(go.Scatter(x=time_grid, y=net_pnl_path, mode='lines', name='Net PnL (Hedge - IL)', line=dict(color='blue', width=2, dash='dash')),
+               row=2, col=1)
+fig2.update_yaxes(title_text="PnL", row=2, col=1)
 
 # Subplot 3: Accumulated Fees
-ax4.plot(time_grid, fees_A_path, label="Accumulated Fees (Token A)", color='purple', linewidth=2)
-ax4.plot(time_grid, fees_B_path, label="Accumulated Fees (Token B)", color='orange', linewidth=2)
-ax4.set_xlabel("Time", fontsize=12)
-ax4.set_ylabel("Accumulated Fees", fontsize=12)
-ax4.legend(fontsize=10)
-ax4.grid(True, linestyle='--', alpha=0.7)
+fig2.add_trace(go.Scatter(x=time_grid, y=fees_A_path, mode='lines', name='Accumulated Fees (Token A)', line=dict(color='purple', width=2)),
+               row=3, col=1)
+fig2.add_trace(go.Scatter(x=time_grid, y=fees_B_path, mode='lines', name='Accumulated Fees (Token B)', line=dict(color='orange', width=2)),
+               row=3, col=1)
+fig2.update_xaxes(title_text="Time", row=3, col=1)
+fig2.update_yaxes(title_text="Accumulated Fees", row=3, col=1)
 
-# Adjust layout to prevent overlapping titles/labels
-plt.tight_layout()
-st.pyplot(fig2)
+fig2.update_layout(
+    title_text="Simulated Price Path, PnL, and Accumulated Fees Over Time",
+    height=900, # Adjust height for three subplots
+    hovermode="x unified",
+    legend=dict(x=0.01, y=0.99, bgcolor='rgba(255,255,255,0.7)', bordercolor='rgba(0,0,0,0.2)'),
+    margin=dict(l=40, r=40, t=80, b=40)
+)
+st.plotly_chart(fig2, use_container_width=True)
